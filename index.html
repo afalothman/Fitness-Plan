@@ -144,8 +144,8 @@ main{padding:16px 16px calc(150px + env(safe-area-inset-bottom));max-width:640px
 .rules b{color:var(--tx)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ta{width:100%;min-height:90px;padding:10px;border-radius:12px;background:var(--bg);border:1px solid var(--line);color:var(--mu);font-size:11px;font-family:ui-monospace,Menlo,monospace;resize:none;outline:none;margin:10px 0}
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(14,15,18,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:8px 4px calc(8px + env(safe-area-inset-bottom,0px))}
-.nb{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:10px;font-weight:700;color:var(--mu);letter-spacing:.03em}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(14,15,18,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 4px calc(8px + env(safe-area-inset-bottom,0px))}
+.nb{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;padding:6px 0;font-size:10px;font-weight:700;color:var(--mu);letter-spacing:.03em}
 .nb svg{width:22px;height:22px}
 .nb.on{color:var(--ac)}
 .toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);background:var(--tx);color:#0E0F12;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:700;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -155,6 +155,10 @@ main{padding:16px 16px calc(150px + env(safe-area-inset-bottom));max-width:640px
 .rd{text-align:center;font-size:12px;font-weight:700;padding:8px 0;border-radius:10px;background:var(--s2);border:1px solid var(--line);color:var(--mu)}
 .rd.done{background:color-mix(in srgb,var(--ok) 15%,transparent);border-color:color-mix(in srgb,var(--ok) 40%,transparent);color:var(--ok)}
 .rd.now{background:var(--ac);border-color:var(--ac);color:#0E0F12}
+.rd.sel{border-color:var(--tx);color:var(--tx);box-shadow:0 0 0 1px var(--tx) inset}
+.rd{font-family:inherit;cursor:pointer}
+.ooo{font-size:12px;line-height:1.5;color:var(--warn);margin-top:8px}
+.ooo button{color:var(--ac);font-weight:700;font-size:12px;padding:0;margin-left:4px}
 .muted{color:var(--mu)}
 
 /* ===== FOOD ===== */
@@ -566,10 +570,14 @@ function lastStr(last,ex){
   return out.join(', ');
 }
 
-function nextDay(){
-  for(var i=S.sessions.length-1;i>=0;i--){var ix=CORE.indexOf(S.sessions[i].day);if(ix>=0)return CORE[(ix+1)%4];}
-  return 'A';
+function roundDone(){
+  var set={};
+  S.sessions.forEach(function(x){if(CORE.indexOf(x.day)<0)return;set[x.day]=1;if(CORE.every(function(c){return set[c];}))set={};});
+  return set;
 }
+function nextDay(){var set=roundDone();for(var i=0;i<CORE.length;i++){if(!set[CORE[i]])return CORE[i];}return 'A';}
+var viewDay=null;
+function pickDay(c){viewDay=(c===nextDay())?null:c;render();}
 function extraThisWeek(){var w=where();if(!w.started)return false;var f=false;S.sessions.forEach(function(x){if(x.day==='E'&&x.block===w.block&&x.week===w.week)f=true;});return f;}
 function streak(){
   var set={};S.sessions.forEach(function(x){set[x.date]=1;});
@@ -851,9 +859,11 @@ function viewToday(){
   var w=where(),p=phase(w.block,w.week);
   if(w.started&&w.block>2)h+='<div class="alert" style="--c:#FFC24B"><div>🧭</div><div><b>Program review due.</b> Both blocks are done — send your coach a check-in before starting a new block.</div></div>';
   h+='<section class="card phase" style="--c:'+p.color+'"><div class="eyebrow">'+(w.started?'Block '+w.block+' · Week '+w.week+' of 7':'Week 1 starts with your first session')+'</div><div class="ph">'+p.label+'</div><div class="pr">Effort: stop <b>'+p.lo+'–'+p.hi+' reps</b> short of failure</div><div class="pn">'+p.note+'</div></section>';
-  var nd=dayById(nextDay());
-  var strip='<div class="round">';CORE.forEach(function(c){strip+='<span class="rd'+(c===nd.id?' now':'')+'">Day '+c+'</span>';});strip+='</div>';
-  h+='<section class="card next"><div class="nd">UP NEXT · IN ORDER</div>'+strip+'<div style="height:10px"></div><div class="nt">'+nd.name+' · '+nd.title+'</div><div class="nf">'+nd.focus+' · ~'+estMin(nd)+' min</div><div class="nl">';
+  var nx=nextDay(),sel=(viewDay&&CORE.indexOf(viewDay)>=0)?viewDay:nx,nd=dayById(sel),rdn=roundDone();
+  var strip='<div class="round">';CORE.forEach(function(c){strip+='<button class="rd'+(rdn[c]?' done':'')+(c===nx?' now':'')+(c===sel&&c!==nx?' sel':'')+'" onclick="pickDay(\''+c+'\')">Day '+c+(rdn[c]?' ✓':'')+'</button>';});strip+='</div>';
+  h+='<section class="card next"><div class="nd">'+(sel===nx?'UP NEXT · IN ORDER':'DAY '+sel+' · OUT OF ORDER')+'</div>'+strip;
+  if(sel!==nx)h+='<div class="ooo">Your order stays the same — Day '+nx+' is still next.<button onclick="pickDay(\''+nx+'\')">Back to Day '+nx+'</button></div>';
+  h+='<div style="height:10px"></div><div class="nt">'+nd.name+' · '+nd.title+'</div><div class="nf">'+nd.focus+' · ~'+estMin(nd)+' min</div><div class="nl">';
   nd.ex.forEach(function(e){if(e.unlock)return;h+='<div>'+esc(e.name)+'<span>'+e.sets+' × '+e.lo+'–'+e.hi+'</span></div>';});
   h+='</div><button class="btn" onclick="startDay(\''+nd.id+'\')">Start '+nd.name+'</button></section>';
   h+='<div class="stats"><div class="stat"><div class="sv">'+weekCount()+'<span class="muted" style="font-size:15px"> / 4</span></div><div class="sl">Sessions this week'+(extraThisWeek()?' <span style="color:var(--ok)">+ Day 5 ✓</span>':'')+'</div></div><div class="stat"><div class="sv">'+S.sessions.length+'</div><div class="sl">Sessions logged</div></div></div>';
@@ -1021,7 +1031,7 @@ function startDay(id){
   if(!S.start)S.start=isoDate(lastSaturday(new Date()));
   var w=where();
   S.active={id:Date.now(),day:id,date:isoDate(new Date()),startTs:Date.now(),block:w.block,week:w.week,bad:false,low:false,sets:{},mode:{},wu:{},shoulder:null,note:''};
-  summary=null;wuOpen=true;save();window.scrollTo(0,0);render();
+  summary=null;wuOpen=true;viewDay=null;save();window.scrollTo(0,0);render();
 }
 function cancelSession(){if(!arm('cancel'))return;S.active=null;save();render();}
 function toggleFlag(f){if(!S.active)return;S.active[f]=!S.active[f];save();render();}
